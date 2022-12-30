@@ -83,6 +83,7 @@ struct mux_session_confirm_ctx {
 	u_int want_agent_fwd;
 	struct sshbuf *cmd;
 	char *term;
+	char *colorterm;
 	struct termios tio;
 	char **env;
 	u_int rid;
@@ -342,6 +343,7 @@ mux_master_process_new_session(struct ssh *ssh, u_int rid,
 	/* Reply for SSHMUX_COMMAND_OPEN */
 	cctx = xcalloc(1, sizeof(*cctx));
 	cctx->term = NULL;
+	cctx->colorterm = NULL;
 	cctx->rid = rid;
 	cmd = NULL;
 	cctx->env = NULL;
@@ -353,6 +355,7 @@ mux_master_process_new_session(struct ssh *ssh, u_int rid,
 	    (r = sshbuf_get_u32(m, &cctx->want_subsys)) != 0 ||
 	    (r = sshbuf_get_u32(m, &escape_char)) != 0 ||
 	    (r = sshbuf_get_cstring(m, &cctx->term, NULL)) != 0 ||
+	    (r = sshbuf_get_cstring(m, &cctx->colorterm, NULL)) != 0 ||
 	    (r = sshbuf_get_cstring(m, &cmd, NULL)) != 0) {
  malf:
 		free(cmd);
@@ -360,6 +363,7 @@ mux_master_process_new_session(struct ssh *ssh, u_int rid,
 			free(cctx->env[j]);
 		free(cctx->env);
 		free(cctx->term);
+		free(cctx->colorterm);
 		free(cctx);
 		error_f("malformed message");
 		return -1;
@@ -385,9 +389,9 @@ mux_master_process_new_session(struct ssh *ssh, u_int rid,
 	}
 
 	debug2_f("channel %d: request tty %d, X %d, agent %d, subsys %d, "
-	    "term \"%s\", cmd \"%s\", env %u", c->self,
+	    "term \"%s\", colorterm \"%s\", cmd \"%s\", env %u", c->self,
 	    cctx->want_tty, cctx->want_x_fwd, cctx->want_agent_fwd,
-	    cctx->want_subsys, cctx->term, cmd, env_len);
+	    cctx->want_subsys, cctx->term, cctx->colorterm, cmd, env_len);
 
 	if ((cctx->cmd = sshbuf_new()) == NULL)
 		fatal_f("sshbuf_new");
@@ -406,6 +410,7 @@ mux_master_process_new_session(struct ssh *ssh, u_int rid,
 				free(cctx->env[j]);
 			free(cctx->env);
 			free(cctx->term);
+			free(cctx->colorterm);
 			sshbuf_free(cctx->cmd);
 			free(cctx);
 			reply_error(reply, MUX_S_FAILURE, rid,
@@ -427,6 +432,7 @@ mux_master_process_new_session(struct ssh *ssh, u_int rid,
 		close(new_fd[1]);
 		close(new_fd[2]);
 		free(cctx->term);
+		free(cctx->colorterm);
 		if (env_len != 0) {
 			for (i = 0; i < env_len; i++)
 				free(cctx->env[i]);
@@ -1391,7 +1397,7 @@ mux_session_confirm(struct ssh *ssh, int id, int success, void *arg)
 	}
 
 	client_session2_setup(ssh, id, cctx->want_tty, cctx->want_subsys,
-	    cctx->term, &cctx->tio, c->rfd, cctx->cmd, cctx->env);
+	    cctx->term, cctx->colorterm, &cctx->tio, c->rfd, cctx->cmd, cctx->env);
 
 	debug3_f("sending success reply");
 	/* prepare reply */
@@ -1412,6 +1418,7 @@ mux_session_confirm(struct ssh *ssh, int id, int success, void *arg)
 	c->open_confirm_ctx = NULL;
 	sshbuf_free(cctx->cmd);
 	free(cctx->term);
+	free(cctx->colorterm);
 	if (cctx->env != NULL) {
 		for (i = 0; cctx->env[i] != NULL; i++)
 			free(cctx->env[i]);
@@ -1865,7 +1872,7 @@ mux_client_request_session(int fd)
 {
 	struct sshbuf *m;
 	char *e;
-	const char *term = NULL;
+	const char *term = NULL, *colorterm = NULL;
 	u_int i, echar, rid, sid, esid, exitval, type, exitval_seen;
 	extern char **environ;
 	int r, rawmode;
@@ -1886,6 +1893,8 @@ mux_client_request_session(int fd)
 	    options.num_setenv)) == NULL || *term == '\0')
 		term = getenv("TERM");
 
+	colorterm = getenv("COLORTERM");
+
 	echar = 0xffffffff;
 	if (options.escape_char != SSH_ESCAPECHAR_NONE)
 	    echar = (u_int)options.escape_char;
@@ -1901,6 +1910,7 @@ mux_client_request_session(int fd)
 	    (r = sshbuf_put_u32(m, options.session_type == SESSION_TYPE_SUBSYSTEM)) != 0 ||
 	    (r = sshbuf_put_u32(m, echar)) != 0 ||
 	    (r = sshbuf_put_cstring(m, term == NULL ? "" : term)) != 0 ||
+	    (r = sshbuf_put_cstring(m, colorterm == NULL ? "" : colorterm)) != 0 ||
 	    (r = sshbuf_put_stringb(m, command)) != 0)
 		fatal_fr(r, "request");
 

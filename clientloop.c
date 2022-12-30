@@ -2556,8 +2556,8 @@ client_send_env(struct ssh *ssh, int id, const char *name, const char *val)
 
 void
 client_session2_setup(struct ssh *ssh, int id, int want_tty, int want_subsystem,
-    const char *term, struct termios *tiop, int in_fd, struct sshbuf *cmd,
-    char **env)
+    const char *term, const char *colorterm, struct termios *tiop, int in_fd,
+    struct sshbuf *cmd, char **env)
 {
 	size_t i, j, len;
 	int matched, r;
@@ -2583,6 +2583,8 @@ client_session2_setup(struct ssh *ssh, int id, int want_tty, int want_subsystem,
 		client_expect_confirm(ssh, id, "PTY allocation", CONFIRM_TTY);
 		if ((r = sshpkt_put_cstring(ssh, term != NULL ? term : ""))
 		    != 0 ||
+		    (r = sshpkt_put_cstring(ssh, colorterm != NULL ?
+			colorterm : "")) != 0 ||
 		    (r = sshpkt_put_u32(ssh, (u_int)ws.ws_col)) != 0 ||
 		    (r = sshpkt_put_u32(ssh, (u_int)ws.ws_row)) != 0 ||
 		    (r = sshpkt_put_u32(ssh, (u_int)ws.ws_xpixel)) != 0 ||

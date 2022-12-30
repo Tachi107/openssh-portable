@@ -1064,6 +1064,8 @@ do_setup_env(struct ssh *ssh, Session *s, const char *shell)
 		child_set_env(&env, &envsize, "TZ", getenv("TZ"));
 	if (s->term)
 		child_set_env(&env, &envsize, "TERM", s->term);
+	if (s->colorterm)
+		child_set_env(&env, &envsize, "COLORTERM", s->colorterm);
 	if (s->display)
 		child_set_env(&env, &envsize, "DISPLAY", s->display);
 
@@ -1911,6 +1913,7 @@ session_pty_req(struct ssh *ssh, Session *s)
 	}
 
 	if ((r = sshpkt_get_cstring(ssh, &s->term, NULL)) != 0 ||
+	    (r = sshpkt_get_cstring(ssh, &s->colorterm, NULL)) != 0 ||
 	    (r = sshpkt_get_u32(ssh, &s->col)) != 0 ||
 	    (r = sshpkt_get_u32(ssh, &s->row)) != 0 ||
 	    (r = sshpkt_get_u32(ssh, &s->xpixel)) != 0 ||
@@ -1921,6 +1924,10 @@ session_pty_req(struct ssh *ssh, Session *s)
 		free(s->term);
 		s->term = NULL;
 	}
+	if (strcmp(s->colorterm, "") == 0) {
+		free(s->colorterm);
+		s->colorterm = NULL;
+	}
 
 	/* Allocate a pty and open it. */
 	debug("Allocating pty.");
@@ -1928,6 +1935,8 @@ session_pty_req(struct ssh *ssh, Session *s)
 	    sizeof(s->tty)))) {
 		free(s->term);
 		s->term = NULL;
+		free(s->colorterm);
+		s->colorterm = NULL;
 		s->ptyfd = -1;
 		s->ttyfd = -1;
 		error("session_pty_req: session %d alloc failed", s->self);
@@ -2432,6 +2441,7 @@ session_close(struct ssh *ssh, Session *s)
 	if (s->ttyfd != -1)
 		session_pty_cleanup(s);
 	free(s->term);
+	free(s->colorterm);
 	free(s->display);
 	free(s->x11_chanids);
 	free(s->auth_display);

@@ -2036,7 +2036,7 @@ static void
 ssh_session2_setup(struct ssh *ssh, int id, int success, void *arg)
 {
 	extern char **environ;
-	const char *display, *term;
+	const char *display, *term, *colorterm;
 	int r, interactive = tty_flag;
 	char *proto = NULL, *data = NULL;
 
@@ -2074,9 +2074,12 @@ ssh_session2_setup(struct ssh *ssh, int id, int success, void *arg)
 	if ((term = lookup_env_in_list("TERM", options.setenv,
 	    options.num_setenv)) == NULL || *term == '\0')
 		term = getenv("TERM");
+
+	colorterm = getenv("COLORTERM");
+
 	client_session2_setup(ssh, id, tty_flag,
 	    options.session_type == SESSION_TYPE_SUBSYSTEM, term,
-	    NULL, fileno(stdin), command, environ);
+	    colorterm, NULL, fileno(stdin), command, environ);
 }
 
 /* open new channel for a session */
